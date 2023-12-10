@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Dynamic;
+using System.Net.NetworkInformation;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using CitizenFX.Core;
@@ -18,6 +20,7 @@ public class PublicDisturbance : Callout
     private bool ready = false;
     private bool pedsIdentified = false;
     private bool stopArguing = false;
+    private bool qbcore = false;
     public static EventHandlerDictionary eventHandlers;
 
     public PublicDisturbance()
@@ -31,7 +34,7 @@ public class PublicDisturbance : Callout
 
     private Vector3 GetLocation()
     {
-        Vector3 randomLoc = Utils.GetRandomLocationInRadius(Game.PlayerPed.Position, 100, 400);
+        Vector3 randomLoc = Utils.GetRandomLocationInRadius(Game.PlayerPed.Position, 100, 850);
         Ped closestPed = Utils.GetClosestPed(randomLoc, 20f, true);
         if (closestPed != null)
         {
@@ -39,7 +42,10 @@ public class PublicDisturbance : Callout
         }
         else
         {
-            return randomLoc; // This could exhaust client
+            if (randomLoc == Vector3.Zero)
+                return GetLocation(); // This could exhaust client
+            else
+                return randomLoc; // This could exhaust client
         }
     }
 
@@ -62,7 +68,6 @@ public class PublicDisturbance : Callout
 
     private async Task AcceptHandler()
     {
-        InitBlip();
         elf = await SpawnElf();
         victim = await Utils.SpawnPedOneSync(Utils.GetRandomPed(), Utils.GetRandomLocationInRadius(Location, 2, 3),
             true);
@@ -74,8 +79,29 @@ public class PublicDisturbance : Callout
             await BaseScript.Delay(100);
         }
 
+        if (elf.Position.DistanceTo(victim.Position) > 3f)
+        {
+            Vector3 newPos = Utils.GetRandomLocationInRadius(victim.Position, 2, 3);
+            if (elf.Position.DistanceTo(victim.Position) > 20f)
+                elf.Position = newPos;
+            Utils.KeepTaskGoToForPed(elf, newPos, 0.5f);
+            await Utils.WaitUntilEntityIsAtPos(elf, newPos, 0.5f);
+        }
+
+        if (victim.Position.DistanceTo(Location) > StartDistance && elf.Position.DistanceTo(Location) > StartDistance)
+            if (victim.Position.DistanceTo(elf.Position) < StartDistance)
+            {
+                Location = victim.Position;
+            }
+            else
+            {
+                victim.Position = Location;
+                elf.Position = Utils.GetRandomLocationInRadius(victim.Position, 2, 3);
+            }
+
         victim.Task.TurnTo(elf);
         elf.Task.TurnTo(victim);
+        InitBlip();
         await BaseScript.Delay(3000);
         PedsWaitScenarioBeforeStart();
         ready = true;
@@ -127,7 +153,8 @@ public class PublicDisturbance : Callout
             SubtitleChat(elf, "You won't take it!", 89, 222, 71);
             await SubtitleChat(victim, "You're weird, dude! Why would I want to follow you?", 7, 145, 224);
             if (stopArguing) return;
-            await SubtitleChat(elf, "My van is just around the corner! I just want to give you my special gift!", 89, 222,
+            await SubtitleChat(elf, "My van is just around the corner! I just want to give you my special gift!", 89,
+                222,
                 71);
             if (stopArguing) return;
             SubtitleChat(victim, "Ew! You creep!", 7, 145, 224);
@@ -148,11 +175,10 @@ public class PublicDisturbance : Callout
 
             Utils.StopKeepTaskPlayAnimation(victim);
             Utils.StopKeepTaskPlayAnimation(elf);
-            
+
             PedsWaitScenarioBeforeStart();
             await BaseScript.Delay(30000);
         }
-        
     }
 
     private async Task StartHandler()
@@ -168,6 +194,7 @@ public class PublicDisturbance : Callout
         Utils.StopKeepTaskPlayAnimation(victim);
         await Utils.WaitUntilEntityIsAtPos(Game.PlayerPed, victim.Position, 2f);
         stopArguing = true;
+        Utils.ImmediatelyStop3DText();
         Utils.StopKeepTaskPlayAnimation(elf);
         Utils.StopKeepTaskPlayAnimation(victim);
         victim.Task.ClearAll();
@@ -192,25 +219,35 @@ public class PublicDisturbance : Callout
         SubtitleChat(elf, "I am his elf!", 89, 222, 71);
         await SubtitleChat(victim, "Be quiet over there.", 7, 145, 224);
         await SubtitleChat(victim, "That's everything.", 7, 145, 224);
-        //
-        Utils.ShowInteractDecision(["To Elf: Now you can explain.","To Elf: Just get out of here."]);
-        // TO-DO: KiloFivePD:Interaction:Trigger=[currentlySelected: int]
-        eventHandlers["KiloFivePD:Interaction:Trigger=0"] += InteractionTrigger0;
-        eventHandlers["KiloFivePD:Interaction:Trigger=1"] += InteractionTrigger1;
-        //
+        // Create object and declare options
+        var interaction =
+            new Utils.DecisionInteraction(["To Elf: Now you can explain.", "To Elf: Just get out of here."]);
+        // Connect a new function (Action) to the choice's index based on that array you sent.
+        // It will run that function when the option is selected.
+        interaction.Connect(0, new Action(async () =>
+        {
+            // To Elf: Now you can explain.
+            Debug.WriteLine("Running thing");
+            await SubtitleChat(elf, "I really am Santa's Elf!", 89, 222, 71);
+            var interaction2 = new Utils.DecisionInteraction([
+                "No you aren't. Santa isn't real.", "Sure.", "I suppose you couldn't prove it if you were."
+            ]);
+            interaction2.Connect(0,new Action(async () =>
+            {
+                await SubtitleChat(Game.PlayerPed, "Come on buddy. Santa isn't real.");
+            }));
+            
+            interaction2.Connect(1,new Action(async () =>
+            {
+                await SubtitleChat(Game.PlayerPed, "Sure.");
+            }));
+            interaction2.Connect(2, new Action(async () =>
+            {
+                await SubtitleChat(Game.PlayerPed, "I suppose you couldn't prove it if you were...");
+            }));
+        }));
     }
 
-    private async Task InteractionTrigger1(string[] lines)
-    {
-        
-    }
-
-    private async Task InteractionTrigger0(string[] lines)
-    {
-        
-    }
-    
-    
 
     private async Task SubtitleChat(Entity entity, string chat, int red = 255, int green = 255, int blue = 255,
         int opacity = 255)
@@ -258,12 +295,13 @@ public class PublicDisturbance : Callout
             elfBlip.Delete();
             elfBlip = null;
         }
+
         API.RemoveAnimDict("anim@amb@nightclub@lazlow@hi_dancefloor@");
         API.RemoveAnimDict("friends@fra@ig_1");
         API.RemoveAnimDict("mini@prostitutestalk");
         API.RemoveAnimDict("anim@heists@ornate_bank@chat_manager");
         API.RemoveAnimDict("mini@darts");
-        
+
         base.OnCancelBefore();
     }
 
@@ -279,5 +317,10 @@ public class script : BaseScript
     public script()
     {
         PublicDisturbance.eventHandlers = EventHandlers;
+        EventHandlers["KiloFivePD:QBCore:GiveItem"] += QBGiveItem;
+    }
+
+    private void QBGiveItem(string itemName)
+    {
     }
 }

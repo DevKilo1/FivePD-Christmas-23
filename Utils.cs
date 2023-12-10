@@ -45,79 +45,115 @@ namespace FivePD_HostageScenarioCallout
         public static bool displayingDecision = false;
         public static bool selectEnabled = false;
         public static int currentselected = -1;
-        
-        public static async Task ShowInteractDecision(string[] choices)
+
+        public static void ClearDecisions()
         {
-            List<string> lines = ConvertChoicesIntoLines(choices);
-            foreach (var line in lines)
-            {
-                displaying2DText.Add(line);
-                Draw2DHandler(line);
-            }
-            displayingDecision = true;
-            HandleInteractButton();
+            displaying2DText.Clear();
         }
 
-        public static async Task HandleInteractButton()
+        public class DecisionInteraction
         {
-            while (displayingDecision)
+            public bool IsActive = true;
+            private Dictionary<int, Action> connected = new Dictionary<int, Action>();
+            public DecisionInteraction(string[] choices)
             {
-                if (Game.IsControlJustReleased(0, Control.MpTextChatTeam))
-                {
-                    if (!selectEnabled)
-                        currentselected = 0;
-                    selectEnabled = !selectEnabled;
-                    API.SetNuiFocusKeepInput(true);
-                    API.SetNuiFocus(selectEnabled, false);
-                    await BaseScript.Delay(100);
-                }
+                if (!IsActive) return;
+                ShowInteractionDecision(choices);
+            }
 
-                if (Game.IsControlJustReleased(0, Control.FrontendDown))
+            public void Connect(int index, Action function)
+            {
+                if (!IsActive) return;
+                Debug.WriteLine("Received thing at index: "+index);
+                if (!connected.ContainsKey(index))
                 {
-                    if (selectEnabled)
+                    connected.Add(index, function);
+                    Debug.WriteLine("Connected successfully");
+                }
+            }
+
+            private async Task ShowInteractionDecision(string[] choices)
+            {
+                if (!IsActive) return;
+                ClearDecisions();
+                List<string> lines = ConvertChoicesIntoLines(choices);
+                foreach (var line in lines)
+                {
+                    displaying2DText.Add(line);
+                    Draw2DHandler(line);
+                }
+                displayingDecision = true;
+                HandleInteractButton();
+            }
+            private async Task HandleInteractButton()
+            {
+                while (displayingDecision)
+                {
+                    if (!IsActive) return;
+                    if (Game.IsControlJustReleased(0, Control.MpTextChatTeam))
                     {
-                        if ((displaying2DText.Count - 2) >= currentselected)
-                            currentselected++;
-                        else
+                        if (!selectEnabled)
                             currentselected = 0;
+                        selectEnabled = !selectEnabled;
+                        API.SetNuiFocusKeepInput(true);
+                        API.SetNuiFocus(selectEnabled, false);
                         await BaseScript.Delay(100);
                     }
-                }
 
-                if (Game.IsControlJustReleased(0, Control.FrontendUp))
-                {
-                    if (selectEnabled)
+                    if (Game.IsControlJustReleased(0, Control.FrontendDown))
                     {
-                        if (currentselected <= 0)
-                            currentselected = displaying2DText.Count - 1;
-                        else
-                            currentselected--;    
+                        if (selectEnabled)
+                        {
+                            if ((displaying2DText.Count - 2) >= currentselected)
+                                currentselected++;
+                            else
+                                currentselected = 0;
+                            await BaseScript.Delay(100);
+                        }
                     }
-                    await BaseScript.Delay(100);
-                }
 
-                if (Game.IsControlJustReleased(0, Control.FrontendEndscreenAccept))
-                {
-                    if (selectEnabled)
+                    if (Game.IsControlJustReleased(0, Control.FrontendUp))
                     {
-                        displayingDecision = false;
-                        selectEnabled = false;
-                        BaseScript.TriggerEvent("KiloFivePD:Interaction:Trigger="+currentselected, displaying2DText.ToArray());
+                        if (selectEnabled)
+                        {
+                            if (currentselected <= 0)
+                                currentselected = displaying2DText.Count - 1;
+                            else
+                                currentselected--;    
+                        }
+                        await BaseScript.Delay(100);
                     }
-                }
+
+                    if (Game.IsControlJustReleased(0, Control.FrontendEndscreenAccept))
+                    {
+                        if (selectEnabled)
+                        {
+                            displayingDecision = false;
+                            selectEnabled = false;
+                            API.SetNuiFocus(selectEnabled, false);
+                            connected[currentselected]();
+                            Debug.WriteLine("Should be running");
+                        }
+                    }
                 
-                await BaseScript.Delay(0);
+                    await BaseScript.Delay(0);
+                }
+            }
+
+            public void Dispose()
+            {
+                IsActive = false;
             }
         }
+
+        
         
 
         public static async Task Remove2D(string text)
         {
             displaying2DText.Remove(text);
         }
-
         
-
         public static async Task Draw2DHandler(string text)
         {
             Vector2 pos = decisionUIPos;
@@ -184,6 +220,11 @@ namespace FivePD_HostageScenarioCallout
         }
 
         public static List<string> Text3DInProgress = new List<string>();
+
+        public static void ImmediatelyStop3DText()
+        {
+            Text3DInProgress.Clear();
+        }
 
         public static void Draw3DText(Vector3 pos, string text, float scaleFactor = 0.5f,
             int duration = 5000, int red = 255, int green = 255, int blue = 255, int opacity = 150)
