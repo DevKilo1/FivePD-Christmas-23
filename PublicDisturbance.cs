@@ -16,12 +16,46 @@ namespace FivePD_Christmas_23;
 public class PublicDisturbance : Callout
 {
     private Ped elf, victim;
-    private Blip victimBlip, elfBlip;
+    private Blip victimBlip, elfBlip, calloutBlip;
     private bool ready = false;
     private bool pedsIdentified = false;
     private bool stopArguing = false;
     private bool qbcore = false;
+    public static float startDistance;
     public static EventHandlerDictionary eventHandlers;
+
+    public ElfRGB elfRGB = new ElfRGB();
+    public VictimRGB victimRGB = new VictimRGB();
+    
+    public struct ElfRGB
+    {
+        public int R { get; }
+
+        public int G { get; }
+
+        public int B { get; }
+
+        public ElfRGB()
+        {
+            R = 89;
+            G = 222;
+            B = 71;
+        }
+    }
+
+    public struct VictimRGB
+    {
+        public int R { get; }
+        public int G { get; }
+        public int B { get; }
+
+        public VictimRGB()
+        {
+            R = 7;
+            G = 145;
+            B = 224;
+        }
+    }
 
     public PublicDisturbance()
     {
@@ -30,6 +64,8 @@ public class PublicDisturbance : Callout
         CalloutDescription = "A man claiming to be an elf has been spotted lurking about the Davis High School.";
         ResponseCode = 3;
         StartDistance = 50f;
+        
+        startDistance = StartDistance;
     }
 
     private Vector3 GetLocation()
@@ -101,31 +137,25 @@ public class PublicDisturbance : Callout
 
         victim.Task.TurnTo(elf);
         elf.Task.TurnTo(victim);
-        InitBlip();
         await BaseScript.Delay(3000);
         PedsWaitScenarioBeforeStart();
         ready = true;
+        calloutBlip = await Utils.CreateLocationBlip(Location, startDistance);
     }
 
     private async Task PedsWaitScenarioBeforeStart()
     {
-        Utils.StopKeepTaskPlayAnimation(elf);
-        Utils.StopKeepTaskPlayAnimation(victim);
         await Utils.RequestAnimDict("anim@amb@nightclub@lazlow@hi_dancefloor@");
         await Utils.RequestAnimDict("friends@fra@ig_1");
         await Utils.RequestAnimDict("mini@prostitutestalk");
         await Utils.RequestAnimDict("anim@heists@ornate_bank@chat_manager");
         await Utils.RequestAnimDict("mini@darts");
-        Utils.StopKeepTaskPlayAnimation(elf);
-        Utils.StopKeepTaskPlayAnimation(victim);
         elf.Task.PlayAnimation("anim@amb@nightclub@lazlow@hi_dancefloor@", "crowddance_mi_17_talking_laz");
         Utils.KeepTaskPlayAnimation(elf, "anim@amb@nightclub@lazlow@hi_dancefloor@", "crowddance_mi_17_talking_laz");
         victim.Task.PlayAnimation("friends@fra@ig_1", "impatient_idle_a", 8f, 8f, -1, AnimationFlags.Loop, 1f);
         Utils.KeepTaskPlayAnimation(victim, "friends@fra@ig_1", "impatient_idle_a");
         while (!Started)
             await BaseScript.Delay(100);
-        Utils.StopKeepTaskPlayAnimation(elf);
-        Utils.StopKeepTaskPlayAnimation(victim);
     }
 
     public override void OnStart(Ped closest)
@@ -133,45 +163,47 @@ public class PublicDisturbance : Callout
         StartHandler();
     }
 
+    
+
     private async Task ArgueConversation()
     {
+        
         while (!stopArguing)
         {
-            Debug.WriteLine("d");
             if (stopArguing) return;
             Utils.StopKeepTaskPlayAnimation(victim);
             Utils.StopKeepTaskPlayAnimation(elf);
             victim.Task.TurnTo(elf);
             await BaseScript.Delay(1000);
             Utils.KeepTaskPlayAnimation(victim, "mini@prostitutestalk", "street_argue_f_a");
-            await SubtitleChat(victim, "Why can't you just go away?", 7, 145, 224);
+            await SubtitleChat(victim, "Why can't you just go away?", victimRGB.R, victimRGB.G, victimRGB.B);
             if (stopArguing) return;
             Utils.StopKeepTaskPlayAnimation(elf);
             Utils.KeepTaskPlayAnimation(elf, "anim@heists@ornate_bank@chat_manager", "wear_weird");
-            await SubtitleChat(elf, "I have your gift!", 89, 222, 71);
+            await SubtitleChat(elf, "I have your gift!", elfRGB.R, elfRGB.G, elfRGB.B);
             if (stopArguing) return;
-            SubtitleChat(elf, "You won't take it!", 89, 222, 71);
-            await SubtitleChat(victim, "You're weird, dude! Why would I want to follow you?", 7, 145, 224);
+            SubtitleChat(elf, "You won't take it!", elfRGB.R, elfRGB.G, elfRGB.B);
+            await SubtitleChat(victim, "You're weird, dude! Why would I want to follow you?", victimRGB.R, victimRGB.G, victimRGB.B);
             if (stopArguing) return;
             await SubtitleChat(elf, "My van is just around the corner! I just want to give you my special gift!", 89,
                 222,
                 71);
             if (stopArguing) return;
-            SubtitleChat(victim, "Ew! You creep!", 7, 145, 224);
+            SubtitleChat(victim, "Ew! You creep!", victimRGB.R, victimRGB.G, victimRGB.B);
             await BaseScript.Delay(500);
             if (stopArguing) return;
-            await SubtitleChat(elf, "You don't understand! Look at me.", 89, 222, 71);
+            await SubtitleChat(elf, "You don't understand! Look at me.", elfRGB.R, elfRGB.G, elfRGB.B);
             if (stopArguing) return;
-            await SubtitleChat(victim, "And what are you supposed to be?", 7, 145, 224);
+            await SubtitleChat(victim, "And what are you supposed to be?", victimRGB.R, victimRGB.G, victimRGB.B);
             if (stopArguing) return;
-            SubtitleChat(elf, "I'm an elf!", 89, 222, 71);
-            if (stopArguing) return;
-            await BaseScript.Delay(500);
-            await SubtitleChat(victim, "Santa is not real, so are his elves. Everybody knows that!", 7, 145, 224);
+            SubtitleChat(elf, "I'm an elf!", elfRGB.R, elfRGB.G, elfRGB.B);
             if (stopArguing) return;
             await BaseScript.Delay(500);
+            await SubtitleChat(victim, "Santa is not real, so are his elves. Everybody knows that!", victimRGB.R, victimRGB.G, victimRGB.B);
             if (stopArguing) return;
-            await SubtitleChat(elf, "I am real!", 89, 222, 71);
+            await BaseScript.Delay(500);
+            if (stopArguing) return;
+            await SubtitleChat(elf, "I am real!", elfRGB.R, elfRGB.G, elfRGB.B);
 
             Utils.StopKeepTaskPlayAnimation(victim);
             Utils.StopKeepTaskPlayAnimation(elf);
@@ -185,6 +217,7 @@ public class PublicDisturbance : Callout
     {
         while (!ready)
             await BaseScript.Delay(100);
+        calloutBlip.ShowRoute = false;
         ShowDialog("Investigate the ~y~disturbance~s~", 5000, StartDistance + 2f);
         // TO-DO: Female starts arguing with male.
         ArgueConversation();
@@ -201,24 +234,26 @@ public class PublicDisturbance : Callout
         victim.Task.TurnTo(Game.PlayerPed);
         elf.Task.ClearAll();
         elf.Task.TurnTo(Game.PlayerPed);
-        SubtitleChat(victim, "Ugh, finally! Some authority here.", 7, 145, 224);
+        SubtitleChat(victim, "Ugh, finally! Some authority here.", victimRGB.R, victimRGB.G, victimRGB.B);
         await BaseScript.Delay(1000);
         victim.Task.PlayAnimation("mini@prostitutestalk", "street_argue_f_b", 8f, 8f, -1, AnimationFlags.Loop, 1f);
         Utils.KeepTaskPlayAnimation(victim, "friends@fra@ig_1", "impatient_idle_a");
         // TO-DO: Start Conversation
-        Utils.KeepTaskPlayAnimation(elf, "anim@mp_player_intcelebrationmale@face_palm", "face_palm");
-        SubtitleChat(elf, "Officer, this is a big misunderstanding.", 89, 222, 71);
+        await Utils.StopKeepTaskPlayAnimation(elf);
+        elf.Task.PlayAnimation("anim@mp_player_intcelebrationmale@face_palm", "face_palm");
+        //Utils.KeepTaskPlayAnimation(elf, "anim@mp_player_intcelebrationmale@face_palm", "face_palm");
+        SubtitleChat(elf, "Officer, this is a big misunderstanding.", elfRGB.R, elfRGB.G, elfRGB.B);
         await BaseScript.Delay(500);
-        await SubtitleChat(victim, "Thank you for coming.", 7, 145, 224);
+        await SubtitleChat(victim, "Thank you for coming.", victimRGB.R, victimRGB.G, victimRGB.B);
         Utils.KeepTaskPlayAnimation(elf, "mini@darts", "wait_idle");
-        await SubtitleChat(victim, "He won't leave me alone.", 7, 145, 224);
-        await SubtitleChat(victim, "I just want him to leave so I can get on with my day.", 7, 145, 224);
-        await SubtitleChat(victim, "He won't stop talking about giving me a gift.", 7, 145, 224);
-        SubtitleChat(victim, "The fool thinks he's Santa's elf.", 7, 145, 224);
+        await SubtitleChat(victim, "He won't leave me alone.", victimRGB.R, victimRGB.G, victimRGB.B);
+        await SubtitleChat(victim, "I just want him to leave so I can get on with my day.", victimRGB.R, victimRGB.G, victimRGB.B);
+        await SubtitleChat(victim, "He won't stop talking about giving me a gift.", victimRGB.R, victimRGB.G, victimRGB.B);
+        SubtitleChat(victim, "The fool thinks he's Santa's elf.", victimRGB.R, victimRGB.G, victimRGB.B);
         await BaseScript.Delay(1000);
-        SubtitleChat(elf, "I am his elf!", 89, 222, 71);
-        await SubtitleChat(victim, "Be quiet over there.", 7, 145, 224);
-        await SubtitleChat(victim, "That's everything.", 7, 145, 224);
+        SubtitleChat(elf, "I am his elf!", elfRGB.R, elfRGB.G, elfRGB.B);
+        await SubtitleChat(victim, "Be quiet over there.", victimRGB.R, victimRGB.G, victimRGB.B);
+        await SubtitleChat(victim, "That's everything.", victimRGB.R, victimRGB.G, victimRGB.B);
         // Create object and declare options
         var interaction =
             new Utils.DecisionInteraction(["To Elf: Now you can explain.", "To Elf: Just get out of here."]);
@@ -227,14 +262,15 @@ public class PublicDisturbance : Callout
         interaction.Connect(0, new Action(async () =>
         {
             // To Elf: Now you can explain.
-            Debug.WriteLine("Running thing");
-            await SubtitleChat(elf, "I really am Santa's Elf!", 89, 222, 71);
+            await SubtitleChat(elf, "I really am Santa's Elf!", elfRGB.R, elfRGB.G, elfRGB.B);
             var interaction2 = new Utils.DecisionInteraction([
                 "No you aren't. Santa isn't real.", "Sure.", "I suppose you couldn't prove it if you were."
             ]);
             interaction2.Connect(0,new Action(async () =>
             {
-                await SubtitleChat(Game.PlayerPed, "Come on buddy. Santa isn't real.");
+                await SubtitleChat(elf, "I am.", elfRGB.R, elfRGB.G, elfRGB.B);
+                Utils.displaying2DText[0] = "";
+                interaction2.Show();
             }));
             
             interaction2.Connect(1,new Action(async () =>

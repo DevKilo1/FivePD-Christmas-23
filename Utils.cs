@@ -7,11 +7,14 @@ using System.Linq;
 using System.Net;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using CitizenFX.Core.Native;
 using CitizenFX.Core.NaturalMotion;
+using FivePD_Christmas_23;
 using FivePD_HostageScenarioCallout;
 using FivePD.API;
+using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Linq;
 
 namespace FivePD_HostageScenarioCallout
@@ -61,16 +64,24 @@ namespace FivePD_HostageScenarioCallout
                 ShowInteractionDecision(choices);
             }
 
+            public void Show()
+            {
+                displayingDecision = true;
+                List<string> lines = UpdateChoicesIndices(displaying2DText);
+                displaying2DText = lines;
+                HandleInteractButton();
+            }
+
             public void Connect(int index, Action function)
             {
                 if (!IsActive) return;
-                Debug.WriteLine("Received thing at index: "+index);
+                
                 if (!connected.ContainsKey(index))
                 {
                     connected.Add(index, function);
-                    Debug.WriteLine("Connected successfully");
                 }
             }
+            
 
             private async Task ShowInteractionDecision(string[] choices)
             {
@@ -158,7 +169,7 @@ namespace FivePD_HostageScenarioCallout
         {
             Vector2 pos = decisionUIPos;
             int index = displaying2DText.IndexOf(text);
-            
+            if (text == "") return;
             foreach (var s in displaying2DText)
             {
                 int i = displaying2DText.IndexOf(s);
@@ -194,6 +205,19 @@ namespace FivePD_HostageScenarioCallout
                 }
                 await BaseScript.Delay(0);
             }
+        }
+
+        public static List<string> UpdateChoicesIndices(List<string> choices)
+        {
+            List<string> newchoices = choices;
+            foreach (var choice in newchoices.ToArray())
+            {
+                int index = displaying2DText.IndexOf(choice);
+                string newchoice = choice.Replace("" + (index + 1).ToString() + ")", "").Trim();
+                newchoices[index] = newchoices.IndexOf(choice) + ") " + newchoice;
+            }
+
+            return newchoices;
         }
 
         public static List<string> ConvertChoicesIntoLines(string[] choices)
@@ -278,6 +302,15 @@ namespace FivePD_HostageScenarioCallout
         {
             while (!API.HasEntityClearLosToEntityInFront(ped1.Handle,ped2.Handle))
                 await BaseScript.Delay(bufferms);
+        }
+        
+        private async Task SubtitleChat(Entity entity, string chat, int red = 255, int green = 255, int blue = 255,
+            int opacity = 255)
+        {
+            int time = chat.Length * 150;
+            Utils.Draw3DText(new Vector3(entity.Position.X, entity.Position.Y, entity.Position.Z + 1f), chat, 0.5f, time,
+                red, green, blue, opacity);
+            await BaseScript.Delay(time);
         }
 
         public static Ped GetClosestPed(Vector3 pos, float maxDistance = 20f, bool ignoreVehicles = false)
@@ -583,6 +616,32 @@ namespace FivePD_HostageScenarioCallout
                 1f);
         }
 
+        public static async Task<Blip> CreateLocationBlip(Vector3 pos, float radius = 5f, bool showRoute = true, BlipColor color = BlipColor.Yellow,
+            BlipSprite sprite = BlipSprite.BigCircle,string name = "", bool isRadius = true, bool attachToEntity = false, Entity entityToAttachTo = null, bool isFlashing = false)
+        {
+            Blip blip;
+            if (!attachToEntity)
+            {
+                blip = isRadius ? World.CreateBlip(pos, radius) : World.CreateBlip(pos);
+            }
+            else
+            {
+                if (entityToAttachTo == null) return null;
+                blip = entityToAttachTo.AttachBlip();
+            }
+            Debug.WriteLine(color.ToString());
+            blip.Sprite = sprite;
+            blip.Name = name;
+            blip.IsFlashing = isFlashing;
+            blip.Color = color;
+            blip.ShowRoute = showRoute;
+            blip.Alpha = 80;
+            
+            Debug.WriteLine(blip.Color.ToString());
+            
+            return blip;
+        }
+
         public static async Task KeepTaskEnterVehicle(Ped ped, Vehicle veh, VehicleSeat targetSeat)
         {
             SetIntoVehicleAfterTimer(ped, veh, VehicleSeat.Any, 30000);
@@ -702,8 +761,12 @@ namespace FivePD_HostageScenarioCallout
             while (keepTaskAnimation.Contains(ped))
             {
                 if (ped == null || ped.IsDead || ped.IsCuffed) break;
+                
                 if (!API.IsEntityPlayingAnim(ped.Handle, animDict, animSet, 3))
+                {
+                    Debug.WriteLine(animDict + ", " +animSet);
                     ped.Task.PlayAnimation(animDict, animSet, 8f, 8f, -1, flags, 1f);
+                }
                 await BaseScript.Delay(1000);
             }
         }
@@ -966,7 +1029,13 @@ namespace FivePD_HostageScenarioCallout
             PedHash.RsRanger01AMO,
             PedHash.Zombie01,
             PedHash.Corpse01,
-            PedHash.Corpse02
+            PedHash.Corpse02,
+            PedHash.Stripper01Cutscene,
+            PedHash.Stripper02Cutscene,
+            PedHash.StripperLite,
+            PedHash.Stripper01SFY,
+            PedHash.Stripper02SFY,
+            PedHash.StripperLiteSFY
         };
     }
 }
